@@ -27,8 +27,8 @@ fn kc_verify_proof_wrapper(
 					log::info!("Verified cell ({}, {}) of block {}", row, col, block_num);
 				},
 				Err(verification_err) => {
-					log::info!("Verification error: {:?}", verification_err);
-					log::info!("Failed for cell ({}, {}) of block {}", row, col, block_num);
+					log::error!("Verification error: {:?}", verification_err);
+					log::error!("Failed for cell ({}, {}) of block {}", row, col, block_num);
 				},
 			}
 
@@ -58,13 +58,13 @@ pub fn verify_proof(
 	let pool = threadpool::ThreadPool::new(cpus);
 	let (tx, rx) = channel::<bool>();
 	let jobs = cells.len();
-	let commitment = Arc::new(commitment.clone());
+	let commitment = Arc::new(commitment);
 
 	for cell in cells {
 		let _row = cell.row;
 		let _col = cell.col;
 		let tx = tx.clone();
-		let commitment = commitment.clone();
+		let commitment = Arc::clone(&commitment);
 
 		pool.execute(move || {
 			tx.send(kc_verify_proof_wrapper(

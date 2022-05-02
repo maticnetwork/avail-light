@@ -3,6 +3,8 @@ extern crate ipfs_embed;
 use ipfs_embed::{Block as IpfsBlock, Cid, DefaultParams, Multiaddr, PeerId, StreamId};
 use serde::{Deserialize, Deserializer, Serialize};
 
+pub type Cells = Vec<Option<Vec<u8>>>;
+
 #[derive(Debug, Eq, PartialEq)]
 pub enum Event {
 	NewListener,
@@ -218,7 +220,8 @@ impl<'a> Deserialize<'a> for Extrinsic {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Header {
-	pub number: String,
+	#[serde(deserialize_with = "deserialize_u64_from_hex")]
+	pub number: u64,
 	#[serde(rename = "extrinsicsRoot")]
 	pub extrinsics_root: ExtrinsicsRoot,
 	#[serde(rename = "parentHash")]
@@ -228,6 +231,14 @@ pub struct Header {
 	digest: Digest,
 	#[serde(rename = "appDataLookup")]
 	pub app_data_lookup: AppDataIndex,
+}
+
+fn deserialize_u64_from_hex<'de, D>(d: D) -> Result<u64, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	let hex = String::deserialize(d)?;
+	u64::from_str_radix(hex.trim_start_matches("0x"), 16).map_err(serde::de::Error::custom)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -292,13 +303,21 @@ pub struct QueryResult {
 	_subscription: String,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct Response {
-	#[serde(rename = "jsonrpc")]
-	_jsonrpc: String,
-	#[serde(rename = "method")]
-	_method: String,
+	jsonrpc: String,
+	method: String,
 	pub params: QueryResult,
+}
+
+#[allow(dead_code)]
+#[derive(Deserialize, Debug)]
+pub struct SubscriptionResponse {
+	jsonrpc: String,
+	pub id: u32,
+	#[serde(rename = "result")]
+	pub subscription_id: String,
 }
 
 #[derive(Debug, Clone)]

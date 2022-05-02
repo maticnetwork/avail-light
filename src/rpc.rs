@@ -1,9 +1,5 @@
-extern crate futures;
-extern crate num_cpus;
-
 use std::{
 	collections::{HashMap, HashSet},
-	sync::{Arc, Mutex},
 	time::SystemTime,
 };
 
@@ -14,8 +10,9 @@ use rand::{thread_rng, Rng};
 use regex::Regex;
 use tokio::net::TcpStream;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+use url::Url;
 
-use crate::types::*;
+use crate::{consts::MAX_CONCURRENT_TASKS, types::*};
 
 fn is_secure(url: &str) -> bool {
 	let re = Regex::new(r"^https://.*").unwrap();
@@ -89,13 +86,13 @@ pub async fn get_block_by_hash(url: &str, hash: String) -> Result<Block> {
 // I'm writing this function so that I can check what's latest block number of chain
 // and start syncer to fetch block headers for block range [0, LATEST]
 pub async fn get_chain_header(url: &str) -> Result<Header> {
-	let payload = format!(r#"{{"id": 1, "jsonrpc": "2.0", "method": "chain_getHeader"}}"#,);
+	const PAYLOAD: &str = r#"{"id": 1, "jsonrpc": "2.0", "method": "chain_getHeader"}"#;
 
 	let req = hyper::Request::builder()
 		.method(hyper::Method::POST)
 		.uri(url)
 		.header("Content-Type", "application/json")
-		.body(hyper::Body::from(payload))
+		.body(hyper::Body::from(PAYLOAD))
 		.context("failed to build HTTP POST request object(get_chainHeader)")?;
 
 	let resp = if is_secure(url) {
@@ -117,10 +114,8 @@ pub async fn get_chain_header(url: &str) -> Result<Header> {
 }
 
 pub async fn get_block_by_number(url: &str, block: u64) -> Result<Block> {
-	match get_blockhash(url, block).await {
-		Ok(hash) => get_block_by_hash(url, hash).await,
-		Err(msg) => Err(msg),
-	}
+	let hash = get_blockhash(url, block).await?;
+	get_block_by_hash(url, hash).await
 }
 
 pub fn generate_random_cells(max_rows: u16, max_cols: u16, block: u64) -> Vec<Cell> {
@@ -169,9 +164,8 @@ pub async fn get_kate_query_proof_by_cell(
 	col: u16,
 ) -> Result<Vec<u8>, String> {
 	let payload: String = format!(
-		r#"{{"id": 1, "jsonrpc": "2.0", "method": "kate_queryProof", "params": [{}, [{}]]}}"#,
-		block,
-		format!(r#"{{"row": {}, "col": {}}}"#, row, col)
+		r#"{{"id": 1, "jsonrpc": "2.0", "method": "kate_queryProof", "params": [{}, [{{"row": {}, "col": {}}}]]}}"#,
+		block, row, col
 	);
 
 	match hyper::Request::builder()
@@ -217,47 +211,30 @@ pub async fn get_kate_query_proof_by_cell(
 /// data matrix has M -many rows and N -many columns.
 ///
 /// Each element of resulting vector either has cell content or has nothing ( represented as None )
-pub async fn get_cells(
-	url: &str,
-	msg: &ClientMsg,
-	cells: &[(usize, usize)],
-) -> Result<Vec<Option<Vec<u8>>>, String> {
+pub async fn get_cells(url: &str, msg: &ClientMsg, cells: &[(usize, usize)]) -> Cells {
 	let begin = SystemTime::now();
-
 	let store_size = (msg.max_rows * msg.max_cols) as usize;
-	let store: Arc<Mutex<Vec<Option<Vec<u8>>>>> = Arc::new(Mutex::new(vec![None; store_size]));
+	let mut store = vec![None; store_size];
 
-	let store_0 = store.clone();
-	let cells_and_store = cells
-		.iter()
-		.map(move |(row, col)| (*row, *col, store_0.clone()));
-
-	stream::iter(cells_and_store)
-		.for_each_concurrent(num_cpus::get(), |(row, col, store)| async move {
-			let proof = get_kate_query_proof_by_cell(url, msg.num, row as u16, col as u16).await;
-
-			let mut handle = store.lock().unwrap();
-			handle[col * msg.max_rows as usize + row] = match proof {
-				Ok(v) => Some(v),
-				Err(e) => {
-					log::info!("error: {}", e);
-					None
-				},
-			}
-		})
+	let proofs = stream::iter(cells)
+		.map(|(row, col)| get_kate_query_proof_by_cell(url, msg.num, *row as u16, *col as u16))
+		.buffered(MAX_CONCURRENT_TASKS)
+		.collect::<Vec<_>>()
 		.await;
+
+	for ((row, col), proof) in cells.iter().zip(proofs.into_iter()) {
+		store[col * msg.max_rows as usize + row] = proof
+			.inspect_err(|e| log::error!("Kate query proof (r:{},c:{}) failed: {}", row, col, e))
+			.ok();
+	}
 
 	log::info!(
 		"Received {} cells of block {}\t{:?}",
 		msg.max_cols * msg.max_rows,
 		msg.num,
-		begin.elapsed().unwrap()
+		begin.elapsed().unwrap_or_default()
 	);
-
-	Arc::try_unwrap(store)
-		.map_err(|_| "Failed to unwrap Arc".to_owned())
-		.map(|lock| lock.into_inner())
-		.and_then(|inner| inner.map_err(|_| "Failed to unwrap Mutex".to_owned()))
+	store
 }
 
 pub async fn get_kate_proof(
@@ -316,8 +293,10 @@ pub async fn get_kate_proof(
 		.await
 		.context("failed to build HTTP POST request object(kate_proof)")?;
 
-	let proofs: BlockProofResponse = serde_json::from_slice(&body)
-		.context("failed to build HTTP POST request object(kate_proof)")?;
+	let proofs: BlockProofResponse = serde_json::from_slice(&body).context(format!(
+		"failed to build HTTP POST request object(kate_proof): {:?}",
+		body
+	))?;
 
 	let proofs_by_cell = proofs.by_cell(cells.len());
 
@@ -370,20 +349,21 @@ pub fn get_id_specific_size(num: Block) -> HashMap<u32, u32> {
 	index
 }
 //parsing the urls given in the vector of urls
-pub fn parse_urls(urls: Vec<String>) -> Result<Vec<url::Url>> {
+pub fn parse_urls<U: AsRef<str>>(urls: &[U]) -> Result<Vec<Url>> {
 	urls.iter()
-		.map(|url| url::Url::parse(url))
+		.map(|url| Url::parse(url.as_ref()))
 		.map(|r| r.map_err(|parse_error| anyhow!("Cannot parse URL: {}", parse_error)))
 		.collect::<Result<Vec<_>>>()
 }
 
 //fn to check the ws url is working properly and return it
 pub async fn check_connection(
-	full_node_ws: &[url::Url],
+	full_node_ws: &[Url],
 ) -> Option<WebSocketStream<MaybeTlsStream<TcpStream>>> {
 	// TODO: We are ignoring errors here, we should probably return result instead of option
 	for url in full_node_ws.iter() {
-		if let Ok((ws, _)) = connect_async(url).await {
+		if let Ok((ws, _response)) = connect_async(url).await {
+			log::info!("Connected to Substrate Node at {}", url);
 			return Some(ws);
 		};
 	}
@@ -391,7 +371,7 @@ pub async fn check_connection(
 }
 
 //fn to check the rpc_url is secure or not and if it is working properly to return
-pub async fn check_http(full_node_rpc: Vec<String>) -> Result<String> {
+pub async fn check_http(full_node_rpc: &[String]) -> Result<String> {
 	let mut rpc_url = String::new();
 	for x in full_node_rpc.iter() {
 		let url_ = x.parse::<hyper::Uri>().context("http url parse failed")?;
