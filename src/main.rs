@@ -6,15 +6,17 @@ use std::{
 	str::FromStr,
 	sync::{mpsc::sync_channel, Arc},
 	thread,
-	time::SystemTime,
+	time::{Duration, SystemTime},
 };
 
 use anyhow::{Context, Result};
 use futures_util::{SinkExt, StreamExt};
 use ipfs_embed::{Multiaddr, PeerId};
+use rand::Rng;
 use rocksdb::{ColumnFamilyDescriptor, Options, DB};
 use simple_logger::SimpleLogger;
 use structopt::StructOpt;
+use tokio::time::sleep;
 use tokio_tungstenite::tungstenite::protocol::Message;
 
 use crate::http::calculate_confidence;
@@ -185,6 +187,11 @@ pub async fn do_main() -> Result<()> {
 
 					// now this is in `u64`
 					let num = header.number;
+
+					let mut rng = rand::thread_rng();
+					let random_duration: u64 = rng.gen_range(0..10_000);
+					log::info!("Sleeping for {}s.", random_duration as f32 / 1000.0);
+					sleep(Duration::from_millis(random_duration)).await;
 
 					let begin = SystemTime::now();
 
