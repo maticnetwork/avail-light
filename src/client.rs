@@ -23,7 +23,9 @@ use ipfs_embed::{
 };
 use kate_recovery::com::{reconstruct_app_extrinsics, Cell};
 use libipld::Ipld;
-use rocksdb::DB;
+use rand::Rng;
+use rocksdb::{DBWithThreadMode, SingleThreaded, DB};
+use tokio::time::sleep;
 
 use crate::{
 	data::{
@@ -228,7 +230,11 @@ pub async fn run_client(
 									Some(v) => {
 										if v.self_computed && v.cid != cid {
 											log::info!(
-												"received CID doesn't match host computed CID"
+												"received CID doesn't match host computed CID for block {}: {} != {}", block, v.cid, cid
+											);
+										} else {
+											log::info!(
+												"MIRKO NEKAD RADI blok {}!", block
 											);
 										}
 										// @note what happens if have-CID is not host computed and
@@ -246,7 +252,7 @@ pub async fn run_client(
 												self_computed: false, // because this block CID is received over network !
 											},
 										) {
-											Ok(_) => {},
+											Ok(_) => {log::info!("MIRKO SAVE CID: {:?}", cid);},
 											Err(e) => {
 												log::info!("error: {}", e);
 											},
@@ -291,7 +297,7 @@ pub async fn run_client(
 							{
 								// this is a question kind message
 								// on ask channel, so this peer is evaluating
-								// whether it can answer it or not !
+								// whether it  answer it or not !
 								if cid == None {
 									match get_block_cid_entry(block_cid_store_1.clone(), block) {
 										Some(v) => {
@@ -326,7 +332,7 @@ pub async fn run_client(
 										Some(v) => {
 											if v.self_computed && v.cid != cid.unwrap() {
 												log::info!(
-													"received CID doesn't match host computed CID"
+													"received CID doesn't match host computed CIDer"
 												);
 											}
 											// @note what happens if have-CID is not host computed and
@@ -344,7 +350,7 @@ pub async fn run_client(
 													self_computed: false, // because this block CID is received over network !
 												},
 											) {
-												Ok(_) => {},
+												Ok(_) => {log::info!("MIRKO SAVE CID2: {:?}", cid.unwrap());},
 												Err(e) => {
 													log::info!("error: {}", e);
 												},
@@ -386,15 +392,18 @@ pub async fn run_client(
 		let rpc_ = check_http(cfg.full_node_rpc.clone()).await?;
 		match block_rx.recv() {
 			Ok(block) => {
+				log::info!("Announced block {}!", block.num);
+				let mut rng = rand::thread_rng();
+				let random_duration: u64 = rng.gen_range(0..10_000);
+				log::info!("Sleeping for {}s.", random_duration as f32 / 1000.0);
+				sleep(Duration::from_millis(random_duration)).await;
 				let block_cid_entry =
 					get_block_cid_entry(block_cid_store.clone(), block.num as i128)
 						.map(|pair| pair.cid);
-				let ipfs_cells = get_matrix(&ipfs, block_cid_entry)
-					.await
-					.unwrap_or_else(|err| {
-						log::info!("Fail to fetch cells from IPFS: {}", err);
-						vec![]
-					});
+				let ipfs_cells = get_matrix(&ipfs, block_cid_entry).await.unwrap_or_else(|err| {
+					log::info!("Fail to fetch cells from IPFS: {}", err);
+					vec![]
+				});
 
 				let requested_cells = empty_cells(&ipfs_cells, block.max_cols, block.max_rows);
 
@@ -485,7 +494,10 @@ pub async fn run_client(
 																self_computed: true, // because this block CID is self-computed !
 															},
 														) {
-															Ok(_) => {},
+															Ok(_) => {
+																let p = get_block_cid_entry(block_cid_store.clone(), block.num as i128);
+																println!("MIRKO set={}, get={}", cid,  p.unwrap().cid);
+															},
 															Err(e) => {
 																log::info!("error: {}", e);
 															},
@@ -703,6 +715,8 @@ pub fn set_block_cid_entry(store: Arc<DB>, block: i128, pair: BlockCidPair) -> R
 		self_computed: pair.self_computed,
 	};
 	let serialised = serde_json::to_string(&serialisable_pair).unwrap();
+
+	log::info!("MIRKO Setting cid: {}", serialised);
 
 	match store.put_cf(
 		&store.cf_handle(crate::consts::BLOCK_CID_CF).unwrap(),

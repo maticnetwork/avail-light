@@ -1,2 +1,4 @@
 target
 .github
+proptest-regressions
+test

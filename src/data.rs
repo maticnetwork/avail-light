@@ -94,8 +94,7 @@ pub fn non_empty_cells_len(matrix: &Matrix) -> usize {
 
 async fn get_cell(ipfs: &Ipfs<DefaultParams>, cid: Cid) -> Result<Option<Cell>> {
 	let peers = ipfs.peers();
-	ipfs.fetch(&cid, peers)
-		.await
+	ipfs.fetch(&cid, peers).await
 		.and_then(|result| result.ipld())
 		.map(|decoded| extract_cell(&decoded))
 		.context("Cannot get cell")
@@ -116,10 +115,8 @@ async fn get_column(ipfs: &Ipfs<DefaultParams>, cid: Cid) -> Result<Column> {
 		.map(|cell_cid| get_cell(ipfs, cell_cid))
 		.collect::<Vec<_>>();
 
-	let col = join_all(future_col).await;
-	col.into_iter()
-		.collect::<Result<Vec<_>>>()
-		.context("Cannot get column cells")
+		let col = join_all(future_col).await;
+		col.into_iter().collect::<Result<Vec<_>>>().context("Cannot get column cells")
 }
 
 pub async fn get_matrix(ipfs: &Ipfs<DefaultParams>, root_cid: Option<Cid>) -> Result<Matrix> {
@@ -140,11 +137,10 @@ pub async fn get_matrix(ipfs: &Ipfs<DefaultParams>, root_cid: Option<Cid>) -> Re
 				.flat_map(|column_cid| column_cid.context("No column block cid"))
 				.map(|column_cid| get_column(ipfs, column_cid))
 				.collect::<Vec<_>>();
-
+				
 			let mat = join_all(future_mat).await;
-			mat.into_iter()
-				.collect::<Result<Vec<_>>>()
-				.context("Cannot get matrix")
+			log::info!("MIRKO matrix {:?}", mat);
+				mat.into_iter().collect::<Result<Vec<_>>>().context("Cannot get matrix")
 		},
 	}
 }
@@ -154,13 +150,15 @@ async fn push_cell(
 	ipfs: &Ipfs<DefaultParams>,
 	pin: &TempPin,
 ) -> anyhow::Result<Cid, String> {
-	match ipfs.temp_pin(pin, cell.cid()) {
+	let res = match ipfs.temp_pin(pin, cell.cid()) {
 		Ok(_) => match ipfs.insert(&cell) {
 			Ok(_) => Ok(*cell.cid()),
 			Err(_) => Err("failed to IPFS insert cell of data matrix".to_owned()),
 		},
 		Err(_) => Err("failed to IPFS pin cell of data matrix".to_owned()),
-	}
+	};
+	ipfs.sync(cell.cid(), ipfs.peers());
+	res
 }
 
 async fn push_col(

@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  lc1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./config1.yaml:/config.yaml
+    network_mode: host
+  lc2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./config2.yaml:/config.yaml
+    network_mode: host
