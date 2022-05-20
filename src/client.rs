@@ -26,7 +26,9 @@ use ipfs_embed::{
 };
 use kate_recovery::com::{reconstruct_app_extrinsics, Cell, ExtendedMatrixDimensions};
 use libipld::Ipld;
+use rand::Rng;
 use rocksdb::DB;
+use tokio::time::sleep;
 
 use crate::{
 	data::{
@@ -407,6 +409,12 @@ pub async fn run_client(
 		let rpc_ = check_http(cfg.full_node_rpc.clone()).await?;
 		match block_rx.recv() {
 			Ok(block) => {
+				log::info!("Announced block {}!", block.num);
+				let mut rng = rand::thread_rng();
+				let random_duration: u64 = rng.gen_range(0..10_000);
+				log::info!("Sleeping for {}s.", random_duration as f32 / 1000.0);
+				sleep(Duration::from_millis(random_duration)).await;
+
 				if cfg.app_id.unwrap_or_default() != -1 {
 					continue;
 				}

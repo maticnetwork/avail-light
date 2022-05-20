@@ -1,0 +1,12 @@
+http_server_host = '127.0.0.1'
+http_server_port = $AVAIL_LIGHT_SERVER_PORT
+ipfs_seed = $AVAIL_LIGHT_IPFS_SEED
+ipfs_port = $AVAIL_LIGHT_IPFS_PORT
+ipfs_path = 'avail_ipfs_node_1'
+full_node_rpc = ['http://127.0.0.1:9933']
+full_node_ws = ['ws://127.0.0.1:9944']
+app_id = $AVAIL_LIGHT_APP_ID
+confidence = 92.0
+bootstraps = [["$AVAIL_LIGHT_PEER_ID", "$AVAIL_LIGHT_PEER_ADDRESS"]]
+avail_path = 'avail_light_client_1'
+log_level = 'DEBUG'

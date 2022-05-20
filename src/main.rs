@@ -18,6 +18,7 @@ use rocksdb::{ColumnFamilyDescriptor, Options, DB};
 use simple_logger::SimpleLogger;
 use structopt::StructOpt;
 use tokio_tungstenite::tungstenite::protocol::Message;
+use tracing::Level;
 
 use crate::http::calculate_confidence;
 
@@ -374,6 +375,7 @@ pub async fn do_main() -> Result<()> {
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
+	tracing::span!(Level::TRACE, "main span");
 	do_main().await.map_err(|e| {
 		log::error!("{:?}", e);
 		e

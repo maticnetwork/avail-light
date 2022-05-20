@@ -349,6 +349,7 @@ dependencies = [
  "threadpool",
  "tokio",
  "tokio-tungstenite",
+ "tracing",
  "url",
 ]
 
@@ -1807,9 +1808,9 @@ dependencies = [
 
 [[package]]
 name = "ipfs-embed"
-version = "0.22.3"
+version = "0.22.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f92bc0a39a129b9049aa7ea8344386ffb6f9efc83dc6967805bdc5326485c54"
+checksum = "4c3eabfe41bd1f8f0da8e251fcf57184ed795366bf5dda8d95c9c775859a6fee"
 dependencies = [
  "anyhow",
  "async-global-executor",
@@ -2310,14 +2311,15 @@ dependencies = [
 
 [[package]]
 name = "libp2p-quic"
-version = "0.5.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1de8fda3ccc284d52049fab92db2b1fcd9d6b0ac4e09760456a2d4d6ada585a7"
+checksum = "efab133f41ec02c6554c10c31e919f24ccca21c61316b1ddc473d1604fc3728a"
 dependencies = [
  "anyhow",
  "async-global-executor",
  "async-io",
  "bytes",
+ "ed25519-dalek",
  "fnv",
  "futures",
  "if-watch",
@@ -3458,9 +3460,9 @@ checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
 
 [[package]]
 name = "quinn-noise"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83e7626a7a184fe86b38d5b3a87722695d3108a89a3d856a75e42e1cfb49db34"
+checksum = "5e1c50d22f398d489a79753d17bab5a6f9fb48e5cc537ce50b0bb9312ae07ea9"
 dependencies = [
  "bytes",
  "chacha20poly1305",
