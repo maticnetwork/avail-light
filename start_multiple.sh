@@ -40,7 +40,9 @@ do
     SELF_PEER_ID="AVAIL_LIGHT_PEER_ID_$i"
     echo "Running instance $i, rpc port: $AVAIL_LIGHT_SERVER_PORT, ipfs port: $AVAIL_LIGHT_IPFS_PORT, peer_id: ${!SELF_PEER_ID}"
     cd $CURR
-    ./avail-light > avail-light.log 2>&1 &
+    COLOR='\\033[0;31m'
+    END_COLOR='\\033[0m' # No Color
+    bash -c "script -q -c ./avail-light avail-light.log | sed -e 's/^/Instance_$i: /'" &
     PIDS+=($!)
     cd $ROOT_DIR
 
