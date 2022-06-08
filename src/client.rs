@@ -471,16 +471,16 @@ pub async fn run_client(
 							block.header.extrinsics_root.commitment,
 						);
 
-						if (verified_cells_count as usize) < cells.len() {
-							log::info!(
-								"Verified {} of {} cells, skipping reconstruction",
-								verified_cells_count,
-								cells.len()
-							);
-							continue;
-						} else {
-							log::info!("Verified {} cells", verified_cells_count);
-						}
+						// if (verified_cells_count as usize) < cells.len() {
+						// 	log::info!(
+						// 		"Verified {} of {} cells, skipping reconstruction",
+						// 		verified_cells_count,
+						// 		cells.len()
+						// 	);
+						// 	continue;
+						// } else {
+						// 	log::info!("Verified {} cells", verified_cells_count);
+						// }
 
 						match construct_matrix(
 							block.num,
@@ -572,7 +572,7 @@ pub async fn run_client(
 												})
 											})
 											.collect::<Vec<_>>();
-									log::debug!(
+									log::info!(
 										"Reconstructed extrinsic: app_id={}, data={:?}",
 										e.0,
 										data_hex_string
