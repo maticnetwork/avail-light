@@ -1,7 +1,7 @@
 use std::{
 	net::SocketAddr,
 	str::FromStr,
-	sync::{mpsc::SyncSender, Arc},
+	sync::{mpsc::SyncSender, Arc, Mutex},
 };
 
 use anyhow::{Context, Result};
@@ -29,6 +29,11 @@ pub struct ConfidenceResponse {
 pub struct ExtrinsicsDataResponse {
 	pub block: u64,
 	pub extrinsics: Vec<AvailExtrinsic>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Status {
+	pub status: u64,
 }
 
 pub fn calculate_confidence(count: u32) -> f64 { 100f64 * (1f64 - 1f64 / 2u32.pow(count) as f64) }
@@ -137,12 +142,18 @@ pub async fn run_server(
 	store: Arc<DB>,
 	cfg: RuntimeConfig,
 	_cell_query_tx: SyncSender<CellContentQueryPayload>,
+	counter: Arc<Mutex<u64>>,
 ) {
 	let host = cfg.http_server_host.clone();
 	let port = cfg.http_server_port;
 
 	let get_mode =
 		warp::path!("v1" / "mode").map(move || warp::reply::json(&Mode::from(cfg.app_id)));
+
+	let get_latest_block = warp::path!("v1" / "latest_block").map(move || {
+		let num = counter.lock().unwrap();
+		warp::reply::json(&*num)
+	});
 
 	let db = store.clone();
 	let get_confidence = warp::path!("v1" / "confidence" / u64)
@@ -152,7 +163,12 @@ pub async fn run_server(
 	let get_appdata = warp::path!("v1" / "appdata" / u64)
 		.map(move |block_num| appdata(block_num, db.clone(), &cfg));
 
-	let routes = warp::get().and(get_mode.or(get_confidence).or(get_appdata));
+	let routes = warp::get().and(
+		get_mode
+			.or(get_latest_block)
+			.or(get_confidence)
+			.or(get_appdata),
+	);
 	let addr = SocketAddr::from_str(format!("{host}:{port}").as_str())
 		.context("Unable to parse host address from config")
 		.unwrap();

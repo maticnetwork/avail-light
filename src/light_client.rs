@@ -1,5 +1,5 @@
 use std::{
-	sync::{mpsc::SyncSender, Arc},
+	sync::{mpsc::SyncSender, Arc, Mutex},
 	time::SystemTime,
 };
 
@@ -29,6 +29,7 @@ pub async fn run(
 	block_tx: SyncSender<ClientMsg>,
 	max_parallel_fetch_tasks: usize,
 	pp: PublicParameters,
+	counter: Arc<Mutex<u64>>,
 ) -> Result<()> {
 	info!("Starting light client...");
 	const BODY: &str = r#"{"id":1, "jsonrpc":"2.0", "method": "chain_subscribeFinalizedHeads"}"#;
@@ -144,6 +145,9 @@ pub async fn run(
 					block_tx
 						.send(types::ClientMsg::from(params.header))
 						.context("Failed to send block message")?;
+
+					let mut lock = counter.lock().unwrap();
+					*lock = block_number;
 				},
 				Err(error) => info!("Misconstructed Header: {:?}", error),
 			}

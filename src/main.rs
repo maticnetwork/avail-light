@@ -1,6 +1,6 @@
 use std::{
 	str::FromStr,
-	sync::{mpsc::sync_channel, Arc},
+	sync::{mpsc::sync_channel, Arc, Mutex},
 	thread, time,
 };
 
@@ -126,8 +126,15 @@ pub async fn do_main() -> Result<()> {
 	// task_1: IPFS client ( query receiver & hopefully successfully resolver )
 	let (cell_query_tx, _) = sync_channel::<crate::types::CellContentQueryPayload>(1 << 4);
 
+	let counter = Arc::new(Mutex::new(0u64));
+
 	// this spawns tokio task which runs one http server for handling RPC
-	tokio::task::spawn(http::run_server(db.clone(), cfg.clone(), cell_query_tx));
+	tokio::task::spawn(http::run_server(
+		db.clone(),
+		cfg.clone(),
+		cell_query_tx,
+		counter.clone(),
+	));
 
 	// communication channels being established for talking to
 	// ipfs backed application client
@@ -200,6 +207,7 @@ pub async fn do_main() -> Result<()> {
 		block_tx,
 		cfg.max_parallel_fetch_tasks,
 		pp,
+		counter.clone(),
 	)
 	.await
 	.context("Failed to run light client")
