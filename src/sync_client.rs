@@ -1,7 +1,4 @@
-use std::{
-	sync::{mpsc::SyncSender, Arc},
-	time::SystemTime,
-};
+use std::{sync::Arc, time::SystemTime};
 
 use anyhow::{anyhow, Context, Result};
 use dusk_plonk::commitment_scheme::kzg10::PublicParameters;
@@ -23,7 +20,6 @@ async fn process_block(
 	store: Arc<DB>,
 	block_number: u64,
 	ipfs: Ipfs<DefaultParams>,
-	send_data: SyncSender<u64>,
 	max_parallel_fetch_tasks: usize,
 	pp: PublicParameters,
 	confidence: f64,
@@ -135,7 +131,6 @@ pub async fn run(
 	end_block: u64,
 	header_store: Arc<DB>,
 	ipfs: Ipfs<DefaultParams>,
-	send_data: SyncSender<u64>,
 	max_parallel_fetch_tasks: usize,
 	pp: PublicParameters,
 	confidence: f64,
@@ -147,7 +142,6 @@ pub async fn run(
 			url.clone(),
 			header_store.clone(),
 			ipfs.clone(),
-			send_data.clone(),
 			pp.clone(),
 		)
 	});
@@ -162,7 +156,6 @@ pub async fn run(
 					store,
 					block_number,
 					ipfs,
-					send_data,
 					max_parallel_fetch_tasks,
 					pp.clone(),
 					confidence,

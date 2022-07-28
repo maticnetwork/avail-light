@@ -136,19 +136,13 @@ pub async fn do_main() -> Result<()> {
 	// task_0: HTTP request handler ( query sender )
 	// task_1: IPFS client ( query receiver & hopefully successfully resolver )
 	let (cell_query_tx, _) = sync_channel::<crate::types::CellContentQueryPayload>(1 << 4);
-	let (block_sync_tx, block_sync_rx) = sync_channel::<u64>(1 << 4);
-	let (latest_block_tx, latest_block_rx) = sync_channel::<u64>(1 << 4);
 	// this spawns tokio task which runs one http server for handling RPC
-	let v:u64 = 0;
-	let count  = Arc::new(Mutex::new(v));
-	let counter_http = Arc::clone(&count);
-	let counter = Arc::clone(&count);
+	let counter = Arc::new(Mutex::new(0u64));
 	tokio::task::spawn(http::run_server(
 		db.clone(),
 		cfg.clone(),
-		latest_block_rx,
 		cell_query_tx,
-		counter_http
+		counter.clone(),
 	));
 
 	// communication channels being established for talking to
@@ -207,7 +201,6 @@ pub async fn do_main() -> Result<()> {
 		latest_block,
 		db.clone(),
 		ipfs.clone(),
-		block_sync_tx,
 		cfg.max_parallel_fetch_tasks,
 		pp.clone(),
 		cfg.confidence,
@@ -221,7 +214,6 @@ pub async fn do_main() -> Result<()> {
 		ipfs,
 		rpc_url,
 		block_tx,
-		latest_block_tx,
 		cfg.max_parallel_fetch_tasks,
 		pp,
 		registry,
